@@ -1,0 +1,26 @@
+[project]
+name = "ryagent"
+version = "0.1.0"
+description = "Your personal multi-agent operator"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "rich>=14.1.0",
+    "textual>=5.3.0",
+    "openai>=1.0.0",
+    "toml>=0.10.2",
+    "aiofiles>=24.0.0",
+    "python-dotenv>=1.1.1",
+]
+
+[project.scripts]
+ry = "ryagent.main:main"
+
+[dependency-groups]
+dev = [
+    "black>=25.1.0",
+    "mypy>=1.17.1",
+    "pytest>=8.4.1",
+    "pytest-asyncio>=1.1.0",
+    "ruff>=0.12.10",
+]
