@@ -1,33 +1,50 @@
-import asyncio
+#!/usr/bin/env python3
+"""Main entry point for RyAgent daemon."""
+
+import argparse
 import sys
-import os
-from pathlib import Path
 
-from .app.integrated_app import RyAgentApp
-from .cfg.config import load_config
+import uvicorn
 
 
-def main():
-    """Main entry point for RyAgent CLI."""
+def main() -> None:
+    """Main entry point for RyAgent daemon."""
+    parser = argparse.ArgumentParser(
+        description="RyAgent - Local AI agent daemon with React web UI"
+    )
+    parser.add_argument(
+        "--host", default="127.0.0.1", help="Host to bind to (default: 127.0.0.1)"
+    )
+    parser.add_argument(
+        "--port", type=int, default=8000, help="Port to bind to (default: 8000)"
+    )
+    parser.add_argument(
+        "--dev", action="store_true", help="Enable development mode with auto-reload"
+    )
+    parser.add_argument(
+        "--reload", action="store_true", help="Enable auto-reload on code changes"
+    )
+
+    args = parser.parse_args()
+
+    # Development mode enables reload by default
+    if args.dev:
+        args.reload = True
+
     try:
-        config = load_config()
-        
-        if not config.model.api_key:
-            print("Error: OPENAI_API_KEY environment variable not set")
-            print("Please set your OpenAI API key:")
-            print("  export OPENAI_API_KEY='your-api-key-here'")
-            sys.exit(1)
-        
-        os.chdir(config.app.workspace)
-        
-        app = RyAgentApp()
-        app.run()
-        
+        uvicorn.run(
+            "ryagent.app.server:app",
+            host=args.host,
+            port=args.port,
+            reload=args.reload,
+            log_level="info" if not args.dev else "debug",
+            access_log=args.dev,
+        )
     except KeyboardInterrupt:
-        print("\nRyAgent terminated by user")
+        print("\nRyAgent daemon stopped by user")
         sys.exit(0)
     except Exception as e:
-        print(f"Error starting RyAgent: {e}")
+        print(f"Error starting RyAgent daemon: {e}")
         sys.exit(1)
 
 

@@ -4,191 +4,88 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-RyAgent is a personal terminal application that hosts multiple LLM agents in tabs. Each tab accepts prompts, can be interrupted, and shows message-level feedback. Tool calls are first-class citizens.
+RyAgent is a local Python daemon that runs multiple LLM agents with a modern React web UI. Uses React + TypeScript + ShadCN for professional frontend interactions with FastAPI JSON backend.
 
-**Key Details:**
-- **Name:** RyAgent (brand); `ryagent` (package/import)
-- **CLI:** `ry`
-- **Language:** Python 3.11+
-- **Package Manager:** uv (fast Python package installer and resolver)
-- **UI Framework:** Textual (tabs, layout, input, keybindings) with Rich for text rendering
-- **Runtime:** `asyncio` for concurrency, subprocesses for tools requiring system access
+## Project Status
 
-## Architecture
+**Current State:** Phase 2 Complete! ✅ Full React + Next.js frontend with TypeScript, ShadCN UI, and FastAPI backend.
 
-### High-Level Structure
-- **TextualApp** hosts a TabBar and TabContent area
-- Each **AgentTab** owns inbox, history, tool registry, and background task runner
-- **Event Bus** passes events between UI and runtime: `UserPrompt`, `AgentReply`, `ToolRequest`, `ToolResult`, `Error`, `Interrupt`
+## Development Commands
 
-### Core Modules
-```
-app/        # Textual UI and wiring
-agents/     # Agent base class and concrete agents
-llm/        # Provider adapters and message formatting
-tools/      # Tool contracts and implementations
-runtime/    # Event bus, task runners, cancellation helpers
-cfg/        # Config loader and schema
-```
-
-### Data Model
-```python
-Role = Literal["user", "assistant", "tool", "system", "error"]
-
-@dataclass
-class Message:
-    role: Role
-    content: str
-    meta: Dict[str, Any] = field(default_factory=dict)
-
-@dataclass
-class AgentState:
-    name: str
-    system_prompt: str
-    history: List[Message] = field(default_factory=list)
-    running: bool = False
-    current_task_id: str | None = None
-```
-
-## Tool System
-
-### Tool Contract
-```python
-class ToolSpec(TypedDict):
-    name: str
-    description: str
-    schema: dict  # JSON schema for args
-    dangerous: bool  # needs explicit allowlist
-
-class Tool:
-    spec: ToolSpec
-    async def run(self, **kwargs) -> dict: ...
-```
-
-### Core Tools (v0)
-- `shell_run(cmd: str, timeout_s: int=60)` - runs commands with allowlist and PTY
-- `fs_read(path: str, bytes: int=65536)` - reads files with size limits
-- `fs_write(path: str, content: str, mode: Literal["create","overwrite"]="create")` - guarded file writing
-
-### Safety Features
-- Command allowlist (e.g., `python`, `uv`, `ls`, `cat`, `rg`, `git status`)
-- Path sandbox rooted at current workspace
-- Timeouts and max output size with truncation indicators
-
-## Configuration
-
-Uses `config.toml` with structure:
-```toml
-[app]
-workspace = "/path/to/ws"
-
-[models.default]
-provider = "openai"
-model = "gpt-4o-mini"
-max_tokens = 4096
-
-[agents.default]
-system_prompt = "You are a helpful coding and ops agent."
-authorized_tools = ["shell_run", "fs_read", "fs_write"]
-
-[tools.shell_run]
-allow = ["python", "uv", "ls", "cat", "rg", "git", "pytest"]
-deny = ["rm", "shutdown", "reboot", "mkfs"]
-```
-
-## Agent Execution Model
-
-1. Receive `UserPrompt`
-2. Build messages from `history + new prompt` and call LLM
-3. If LLM requests tools via structured function calls, dispatch them
-4. Append all outputs as messages in the tab
-5. Stop (no autonomous multi-step loops in v0)
-
-## UI Design
-
-### Layout
-- **Header:** RyAgent, current tab name, run/stop indicator
-- **Left:** Tab list (scrollable)
-- **Center:** Conversation view for active tab
-- **Bottom:** Input box + send key
-
-### Key Bindings
-- `Ctrl+Tab` - next tab
-- `Ctrl+Shift+Tab` - previous tab
-- `t` - new tab
-- `x` - close tab
-- `Enter` - send prompt
-- `Ctrl+C` - interrupt current run
-
-## Development Milestones
-
-### v0.0.1 - Skeleton
-Textual app with tabs, input box, message view. One hard-coded agent.
-
-### v0.0.2 - Tools
-Implement core tools with allowlist and sandbox. Tool results as messages.
-
-### v0.0.3 - Multiple Agents
-Per-tab config (system prompt, model, tools). Add interrupt. Basic config loader.
-
-### v0.1.0 - Polish
-Error handling, truncation notices, message persistence, keybinding cheatsheet.
-
-## Development Setup
-
-### Prerequisites
-- Python 3.11+
-- uv package manager
-
-### Initial Setup
 ```bash
-# Install uv if not already installed
-curl -LsSf https://astral.sh/uv/install.sh | sh
+# Setup
+uv sync                              # Install Python dependencies
+cd frontend && bun install          # Install frontend dependencies
 
-# Initialize Python project with uv
-uv init --python 3.11
-uv add textual rich
+# Development (Two terminals needed)
+# Terminal 1 - Backend API server:
+uv run python -m ryagent.main --dev # Start Python API server (localhost:8000)
 
-# Add development dependencies
-uv add --dev pytest pytest-asyncio black ruff mypy
+# Terminal 2 - Frontend dev server: 
+cd frontend && bun run dev          # Start React dev server (localhost:3000)
 
-# Create virtual environment and install dependencies
-uv sync
+# Production build
+cd frontend && bun run build        # Build React app for production
+uv run python -m ryagent.main      # Start server (serves API + built frontend)
+
+# Code formatting
+uv run ruff format .                # Format Python code
+cd frontend && bun run lint         # Lint React code
+
+# Testing
+uv run pytest                      # Run Python tests
+uv run pytest tests/integration/   # Integration tests only
 ```
 
-### Common Commands
-```bash
-# Install new dependency
-uv add <package-name>
+## Key Architecture Decisions
 
-# Install development dependency
-uv add --dev <package-name>
+- **Backend**: FastAPI JSON API server with CORS support
+- **Frontend**: React + Next.js + TypeScript with ShadCN UI components 
+- **Build Tool**: Bun for fast package management and development
+- **Real-time**: Ready for SSE/WebSocket integration (Phase 3)
+- **Styling**: Tailwind CSS with professional component library
+- **API Style**: RESTful JSON API with proper error handling
+- **Auth**: Token-based authentication with auto-token generation
+- **Production**: Single server serves both API and static frontend
 
-# Run the application
-uv run python -m ryagent
+## Development Guidelines
 
-# Run tests
-uv run pytest
+### When working on this codebase:
 
-# Format code
-uv run black .
+1. **Frontend**: Use React + TypeScript with ShadCN UI components
+2. **API Integration**: Always use the typed API client for backend calls
+3. **State Management**: Use React hooks and context for state management  
+4. **Error Handling**: Implement proper error boundaries and user feedback
+5. **Styling**: Use Tailwind CSS classes with ShadCN component variants
+6. **Development**: Use Bun for frontend, uv for Python backend
+7. **Testing**: Maintain comprehensive test coverage for both frontend and backend
 
-# Lint code
-uv run ruff check .
+### Current File Organization:
+- `project_plan.md` - Development plan with phases completion status
+- `quick_notes.md` - Original specification document  
+- `ryagent/app/server.py` - FastAPI JSON API server with frontend serving
+- `ryagent/core/models.py` - Pydantic data models
+- `ryagent/utils/auth.py` - Token-based authentication
+- `frontend/` - Complete React + Next.js application
+  - `frontend/src/app/` - Next.js app router pages
+  - `frontend/src/components/` - React components and ShadCN UI
+  - `frontend/src/lib/` - API client and utilities
+  - `frontend/src/contexts/` - React context providers
+- `tests/` - Unit and integration tests
 
-# Type checking
-uv run mypy .
+### Phase 2 Accomplishments:
+- ✅ **React + Next.js frontend** with TypeScript and ShadCN UI
+- ✅ **FastAPI JSON API** with CORS and proper error handling
+- ✅ **Authentication system** with React context and token management
+- ✅ **Modern development stack** (Bun, Tailwind, professional components)
+- ✅ **Production deployment** (single server serves API + frontend)
+- ✅ **Type-safe API client** with full TypeScript integration
 
-# Update dependencies
-uv sync --upgrade
-```
+## Important Notes
 
-## Development Notes
-
-- Run LLM calls and tools as background tasks to avoid blocking Textual's event loop
-- Use `asyncio.Queue` to buffer outgoing messages per tab
-- Batch UI updates at ~30-60 Hz
-- Cap message history length in memory, rotate to disk when needed
-- Tool results appear as single `tool` message with JSON summary
-- Interrupt cancels both LLM streams and child subprocesses
-- Use `uv run` prefix for all Python commands to ensure proper virtual environment activation
+- **License:** AGPL-3.0 (network copyleft)  
+- **Python:** 3.11+ required
+- **Node.js:** Bun runtime for optimal frontend development
+- **Philosophy:** Local-first, security by design, modern web stack
+- **Status:** Phase 2 complete, ready for Phase 3 (LLM + real-time features)
+- Modern React frontend with production-ready FastAPI backend
